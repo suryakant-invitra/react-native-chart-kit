@@ -2,6 +2,9 @@ import { TextStyle, ViewStyle } from "react-native";
 import { CircleProps, TextProps } from "react-native-svg";
 
 export interface Dataset {
+  timeIndex: any;
+  unit: any;
+  dotColor: any;
   /** The data corresponding to the x-axis label. */
   data: number[];
 
@@ -135,7 +138,7 @@ export interface ChartConfig {
    * Override text style for additional info view upper scrollable dot
    */
   scrollableInfoTextStyle?: Partial<TextStyle>;
-  scrollableInfoTextDecorator?: (value: number) => string;
+  scrollableInfoTextDecorator?: (value: number, extra: any) => string;
 
   /**
    * Set Info View offset

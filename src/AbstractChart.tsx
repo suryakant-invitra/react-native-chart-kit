@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, { Component, Fragment } from "react";
 import { Defs, Line, LinearGradient, Stop, Text } from "react-native-svg";
 
 import { ChartConfig, Dataset, PartialBy } from "./HelperTypes";
@@ -31,6 +31,8 @@ export interface AbstractChartConfig extends ChartConfig {
   verticalLabelRotation?: number;
   formatXLabel?: (xLabel: string) => string;
   verticalLabelsHeightPercentage?: number;
+  unit?: any;
+  timeIndex?: Dataset[];
 }
 
 export type AbstractChartState = {};
@@ -145,7 +147,7 @@ class AbstractChart<
       const y = (basePosition / count) * i + paddingTop;
       return (
         <Line
-          key={Math.random()}
+          key={Math.random() + Date.now()}
           x1={paddingRight}
           y1={y}
           x2={width}
@@ -166,7 +168,7 @@ class AbstractChart<
     } = config;
     return (
       <Line
-        key={Math.random()}
+        key={Math.random() + Date.now()}
         x1={paddingRight}
         y1={height * verticalLabelsHeightPercentage + paddingTop}
         x2={width}
@@ -224,7 +226,7 @@ class AbstractChart<
         <Text
           rotation={horizontalLabelRotation}
           origin={`${x}, ${y}`}
-          key={Math.random()}
+          key={Math.random() + Date.now()}
           x={x}
           textAnchor="end"
           y={y}
@@ -273,6 +275,13 @@ class AbstractChart<
     if (stackedBar) {
       fac = 0.71;
     }
+    let tl = labels.length;
+    let mp = 50;
+    let istl = tl > mp;
+    let ratio = 1;
+    if (istl) {
+      ratio = Math.floor(tl / mp);
+    }
 
     return labels.map((label, i) => {
       if (hidePointsAtIndex.includes(i)) {
@@ -291,18 +300,45 @@ class AbstractChart<
         fontSize * 2 +
         xLabelsOffset;
 
-      return (
+      return i == 0 || i == labels.length - 1 ? (
+        <Fragment key={Math.random() + Date.now() + "_f"}>
+          <Text
+            origin={`${x}, ${y}`}
+            rotation={verticalLabelRotation}
+            key={Math.random()}
+            x={x}
+            y={y}
+            textAnchor={verticalLabelRotation === 0 ? "middle" : "start"}
+            {...this.getPropsForLabels()}
+            {...this.getPropsForVerticalLabels()}
+          >
+            {`${formatXLabel(label)}${xAxisLabel}`}
+          </Text>
+          <Text
+            origin={x + ", " + y}
+            rotation={verticalLabelRotation}
+            key={Math.random() + Date.now()}
+            x={x}
+            y={y - 12}
+            textAnchor={verticalLabelRotation === 0 ? "middle" : "start"}
+            {...this.getPropsForLabels()}
+            {...this.getPropsForVerticalLabels()}
+          >
+            {"|"}
+          </Text>
+        </Fragment>
+      ) : (
         <Text
-          origin={`${x}, ${y}`}
+          origin={x + ", " + y}
           rotation={verticalLabelRotation}
-          key={Math.random()}
+          key={Math.random() + Date.now()}
           x={x}
-          y={y}
+          y={y - 12}
           textAnchor={verticalLabelRotation === 0 ? "middle" : "start"}
           {...this.getPropsForLabels()}
           {...this.getPropsForVerticalLabels()}
         >
-          {`${formatXLabel(label)}${xAxisLabel}`}
+          {istl ? (i % ratio == 0 ? "|" : "") : "|"}
         </Text>
       );
     });
@@ -333,7 +369,7 @@ class AbstractChart<
       (_, i) => {
         return (
           <Line
-            key={Math.random()}
+            key={Math.random() + Date.now()}
             x1={Math.floor(
               ((width - paddingRight) / (data.length / yAxisInterval)) * i +
                 paddingRight
@@ -361,7 +397,7 @@ class AbstractChart<
     "height" | "paddingRight" | "paddingTop" | "verticalLabelsHeightPercentage"
   >) => (
     <Line
-      key={Math.random()}
+      key={Math.random() + Date.now()}
       x1={Math.floor(paddingRight)}
       y1={0}
       x2={Math.floor(paddingRight)}

@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React, { ReactNode, Fragment } from "react";
 import {
   Animated,
   ScrollView,
@@ -14,7 +14,10 @@ import {
   Polygon,
   Polyline,
   Rect,
-  Svg
+  Svg,
+  Defs,
+  LinearGradient,
+  Stop
 } from "react-native-svg";
 
 import AbstractChart, {
@@ -170,6 +173,7 @@ export interface LineChartProps extends AbstractChartProps {
    * Renders additional content for dots in a line chart.
    * Takes `({x, y, index})` as arguments.
    */
+
   renderDotContent?: (params: {
     x: number;
     y: number;
@@ -179,6 +183,7 @@ export interface LineChartProps extends AbstractChartProps {
   /**
    * Rotation angle of the horizontal labels - default 0 (degrees).
    */
+
   horizontalLabelRotation?: number;
   /**
    * Rotation angle of the vertical labels - default 0 (degrees).
@@ -214,6 +219,8 @@ export interface LineChartProps extends AbstractChartProps {
    * The number of horizontal lines
    */
   segments?: number;
+  unit?: any;
+  timeIndex?: [];
 }
 
 type LineChartState = {
@@ -222,6 +229,7 @@ type LineChartState = {
 
 class LineChart extends AbstractChart<LineChartProps, LineChartState> {
   label = React.createRef<TextInput>();
+  dot = React.createRef<any>();
 
   state = {
     scrollableDotHorizontalOffset: new Animated.Value(0)
@@ -234,7 +242,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
   getStrokeWidth = (dataset: Dataset) => {
     return dataset.strokeWidth || this.props.chartConfig.strokeWidth || 3;
   };
-
+  dotEvents = null;
   getDatas = (data: Dataset[]): number[] => {
     return data.reduce(
       (acc, item) => (item.data ? [...acc, ...item.data] : acc),
@@ -352,7 +360,14 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
     scrollableDotRadius,
     scrollableInfoViewStyle,
     scrollableInfoTextStyle,
-    scrollableInfoTextDecorator = x => `${x}`,
+    unit = data[0].unit,
+    timeIndex = data[0]?.timeIndex ? data[0]?.timeIndex : [],
+    scrollableInfoTextDecorator = (x, t) => {
+      if (t && t != "") {
+        lt = t;
+      }
+      return `${x} ${unit} \n ${lt}`;
+    },
     scrollableInfoSize,
     scrollableInfoOffset
   }: AbstractChartConfig & {
@@ -370,8 +385,11 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
       vl.push(index * perData);
     }
     let lastIndex: number;
-
-    scrollableDotHorizontalOffset.addListener(value => {
+    let lt: number;
+    if (this.dotEvents) {
+      scrollableDotHorizontalOffset.addListener(this.dotEvents);
+    }
+    this.dotEvents = scrollableDotHorizontalOffset.addListener(value => {
       const index = value.value / perData;
       if (!lastIndex) {
         lastIndex = index;
@@ -380,10 +398,18 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
       let abs = Math.floor(index);
       let percent = index - abs;
       abs = data[0].data.length - abs - 1;
-
+      let Point = data[0].dotColor;
+      let matrix = data[0].data;
+      let _dotColor = Point?.[data[0].data[0]]
+        ? Point?.[data[0].data[0]]
+        : "#00B5E2";
       if (index >= data[0].data.length - 1) {
+        let time = timeIndex?.[abs];
         this.label.current.setNativeProps({
-          text: scrollableInfoTextDecorator(Math.floor(data[0].data[0]))
+          text: scrollableInfoTextDecorator(Math.floor(data[0].data[0]), time)
+        });
+        this.dot.current.setNativeProps({
+          fill: _dotColor
         });
       } else {
         if (index > lastIndex) {
@@ -393,18 +419,24 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
           const prev = data[0].data[abs - 1];
           if (prev > base) {
             let rest = prev - base;
-            this.label.current.setNativeProps({
-              text: scrollableInfoTextDecorator(
-                Math.floor(base + percent * rest)
-              )
-            });
+            let aqi = Math.floor(base + percent * rest);
+            if (Point.hasOwnProperty(aqi)) {
+              let time = timeIndex?.[abs];
+              this.label.current.setNativeProps({
+                text: scrollableInfoTextDecorator(aqi, time)
+              });
+              _dotColor = Point[aqi];
+            }
           } else {
             let rest = base - prev;
-            this.label.current.setNativeProps({
-              text: scrollableInfoTextDecorator(
-                Math.floor(base - percent * rest)
-              )
-            });
+            let aqi = Math.floor(base + percent * rest);
+            if (Point.hasOwnProperty(aqi)) {
+              let time = timeIndex?.[abs];
+              this.label.current.setNativeProps({
+                text: scrollableInfoTextDecorator(aqi, time)
+              });
+              _dotColor = Point[aqi];
+            }
           }
         } else {
           // to left
@@ -414,21 +446,30 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
           percent = 1 - percent;
           if (next > base) {
             let rest = next - base;
-            this.label.current.setNativeProps({
-              text: scrollableInfoTextDecorator(
-                Math.floor(base + percent * rest)
-              )
-            });
+            let aqi = Math.floor(base + percent * rest);
+            if (Point.hasOwnProperty(aqi)) {
+              let time = timeIndex?.[abs];
+              this.label.current.setNativeProps({
+                text: scrollableInfoTextDecorator(aqi, time)
+              });
+              _dotColor = Point[aqi];
+            }
           } else {
             let rest = base - next;
-            this.label.current.setNativeProps({
-              text: scrollableInfoTextDecorator(
-                Math.floor(base - percent * rest)
-              )
-            });
+            if (Point.hasOwnProperty(next)) {
+              let time = timeIndex?.[abs];
+              this.label.current.setNativeProps({
+                text: scrollableInfoTextDecorator(next, time)
+              });
+              _dotColor = Point[next];
+            }
           }
         }
       }
+      this.dot.current &&
+        this.dot.current.setNativeProps({
+          fill: _dotColor
+        });
       lastIndex = index;
     });
 
@@ -494,7 +535,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
 
       output.push([
         <Animated.View
-          key={Math.random()}
+          key={Math.random() + Date.now()}
           style={[
             scrollableInfoViewStyle,
             {
@@ -509,24 +550,43 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
         >
           <TextInput
             onLayout={() => {
-              this.label.current.setNativeProps({
-                text: scrollableInfoTextDecorator(
-                  Math.floor(data[0].data[data[0].data.length - 1])
-                )
-              });
+              !lastIndex &&
+                this.label.current.setNativeProps({
+                  text: scrollableInfoTextDecorator(
+                    Math.floor(data[0].data[data[0].data.length - 1]),
+                    timeIndex?.[timeIndex.length - 1]
+                  )
+                });
             }}
             style={scrollableInfoTextStyle}
             ref={this.label}
           />
+          <View
+            style={{
+              position: "absolute",
+              height: 12,
+              width: 2,
+              backgroundColor: "#ccc",
+              bottom: -12,
+              marginLeft: scrollableInfoSize.width / 2 - 1
+            }}
+          ></View>
         </Animated.View>,
         <AnimatedCircle
-          key={Math.random()}
+          key={Math.random() + Date.now()}
           cx={translateX}
           cy={translateY}
           r={scrollableDotRadius}
           stroke={scrollableDotStrokeColor}
           strokeWidth={scrollableDotStrokeWidth}
-          fill={scrollableDotFill}
+          fill={
+            data[0]?.dotColor
+              ? data[0]?.dotColor[
+                  Math.floor(data[0].data[data[0].data.length - 1])
+                ]
+              : "#00B5E2"
+          }
+          ref={this.dot}
         />
       ]);
     });
@@ -708,6 +768,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
     "data" | "width" | "height" | "paddingRight" | "paddingTop"
   >) => {
     return data.map((dataset, index) => {
+      let len = dataset.colors.length;
       const result = this.getBezierLinePoints(dataset, {
         width,
         height,
@@ -716,16 +777,50 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
         data
       });
 
+      // return (
+      //   <Path
+      //     key={index}
+      //     d={result}
+      //     fill="none"
+      //     stroke={this.getColor(dataset, 0.2)}
+      //     strokeWidth={this.getStrokeWidth(dataset)}
+      //     strokeDasharray={dataset.strokeDashArray}
+      //     strokeDashoffset={dataset.strokeDashOffset}
+      //   />
+      // );
       return (
-        <Path
-          key={index}
-          d={result}
-          fill="none"
-          stroke={this.getColor(dataset, 0.2)}
-          strokeWidth={this.getStrokeWidth(dataset)}
-          strokeDasharray={dataset.strokeDashArray}
-          strokeDashoffset={dataset.strokeDashOffset}
-        />
+        <Fragment key={Math.random() + Date.now() + "_f"}>
+          <Defs>
+            <LinearGradient
+              key={Math.random() + Date.now()}
+              id="gradline"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+            >
+              {dataset.colors.map((x, ind) => {
+                let custColor = x as any;
+                let op = len == ind + 1 ? (len == 1 ? ".7" : ".7") : ".7";
+                return (
+                  <Stop
+                    key={`clline-${ind}`}
+                    offset={ind}
+                    stopColor={custColor.x}
+                    stopOpacity={op}
+                  />
+                );
+              })}
+            </LinearGradient>
+          </Defs>
+          <Path
+            key={"line-" + Math.random() + Date.now()}
+            d={result}
+            fill="none"
+            stroke={"url(#gradline)"}
+            strokeWidth={this.getStrokeWidth(dataset)}
+          />
+        </Fragment>
       );
     });
   };
@@ -744,6 +839,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
     useColorFromDataset: AbstractChartConfig["useShadowColorFromDataset"];
   }) =>
     data.map((dataset, index) => {
+      let len = dataset.colors.length;
       const d =
         this.getBezierLinePoints(dataset, {
           width,
@@ -758,14 +854,37 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
           paddingTop} L${paddingRight},${(height / 4) * 3 + paddingTop} Z`;
 
       return (
-        <Path
-          key={index}
-          d={d}
-          fill={`url(#fillShadowGradient${
-            useColorFromDataset ? `_${index}` : ""
-          })`}
-          strokeWidth={0}
-        />
+        <Fragment key={"grad-" + Math.random() + Date.now() + "-f"}>
+          <Defs>
+            <LinearGradient
+              key={"grad-" + Math.random() + Date.now()}
+              id="grad"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              {dataset.colors.map((x, ind) => {
+                let colorItem = x as any;
+                let op = len == ind + 1 ? (len == 1 ? ".6" : ".1") : ".6";
+                return (
+                  <Stop
+                    key={`cl-${ind}`}
+                    offset={ind}
+                    stopColor={colorItem.x}
+                    stopOpacity={op}
+                  />
+                );
+              })}
+            </LinearGradient>
+          </Defs>
+          <Path
+            key={"line1-" + Math.random() + Date.now()}
+            d={d}
+            fill={"url(#grad" + (useColorFromDataset ? "_" + index : "") + ")"}
+            strokeWidth={0}
+          />
+        </Fragment>
       );
     });
 
@@ -841,10 +960,11 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
     const legendOffset = this.props.data.legend ? height * 0.15 : 0;
 
     return (
-      <View style={style}>
+      <View style={style} key={Date.now() + "patil" + Math.random()}>
         <Svg
           height={height + (paddingBottom as number) + legendOffset}
           width={width - (margin as number) * 2 - (marginRight as number)}
+          key={Date.now() + "suryakant" + Math.random()}
         >
           <Rect
             width="100%"
@@ -856,13 +976,13 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
           />
           {this.props.data.legend &&
             this.renderLegend(config.width, legendOffset)}
-          <G x="0" y={legendOffset}>
+          <G x="0" y={legendOffset} key={Date.now() + "axs" + Math.random()}>
             {this.renderDefs({
               ...config,
               ...chartConfig,
               data: data.datasets
             })}
-            <G>
+            <G key={Date.now() + "axsoit" + Math.random()}>
               {withHorizontalLines &&
                 (withInnerLines
                   ? this.renderHorizontalLines({
@@ -879,7 +999,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                     })
                   : null)}
             </G>
-            <G>
+            <G key={Date.now() + "axsoi" + Math.random()}>
               {withHorizontalLabels &&
                 this.renderHorizontalLabels({
                   ...config,
@@ -891,7 +1011,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                   decimalPlaces: chartConfig.decimalPlaces
                 })}
             </G>
-            <G>
+            <G key={Date.now() + "axsret" + Math.random()}>
               {withVerticalLines &&
                 (withInnerLines
                   ? this.renderVerticalLines({
@@ -908,7 +1028,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                     })
                   : null)}
             </G>
-            <G>
+            <G key={Date.now() + "axstye" + Math.random()}>
               {withVerticalLabels &&
                 this.renderVerticalLabels({
                   ...config,
@@ -918,7 +1038,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                   formatXLabel
                 })}
             </G>
-            <G>
+            <G key={Date.now() + "axstky" + Math.random()}>
               {this.renderLine({
                 ...config,
                 ...chartConfig,
@@ -927,7 +1047,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                 data: data.datasets
               })}
             </G>
-            <G>
+            <G key={Date.now() + "axstkjy" + Math.random()}>
               {withShadow &&
                 this.renderShadow({
                   ...config,
@@ -937,7 +1057,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                   useColorFromDataset: chartConfig.useShadowColorFromDataset
                 })}
             </G>
-            <G>
+            <G key={Date.now() + "axstytt" + Math.random()}>
               {withDots &&
                 this.renderDots({
                   ...config,
@@ -947,7 +1067,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                   onDataPointClick
                 })}
             </G>
-            <G>
+            <G key={Date.now() + "axstyyt" + Math.random()}>
               {withScrollableDot &&
                 this.renderScrollableDot({
                   ...config,
@@ -959,7 +1079,7 @@ class LineChart extends AbstractChart<LineChartProps, LineChartState> {
                   scrollableDotHorizontalOffset
                 })}
             </G>
-            <G>
+            <G key={Date.now() + "axstyyz" + Math.random()}>
               {decorator &&
                 decorator({
                   ...config,
